@@ -2,7 +2,7 @@
 
 # ovpnutil
 
-Go client for OpenVPN management interface
+Go client for OpenVPN [management interface](https://openvpn.net/index.php/open-source/documentation/miscellaneous/79-management-interface.html).
 
 ## Installation
 
