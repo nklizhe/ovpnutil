@@ -80,6 +80,68 @@ func ParseState(line string) (State, error) {
 	}, nil
 }
 
+// Status openvpn
+type Status struct {
+	Clients     []Client
+	Routing     []Route
+	GlobalStats GlobalStats
+}
+
+// GlobalStats
+type GlobalStats struct {
+	Queue string
+}
+
+// Client represent an openvpn status user
+type Client struct {
+	VirtualIP      string
+	RealIP         string
+	CommonName     string
+	BytesReceived  string
+	BytesSent      string
+	ConnectedSince string
+}
+
+func ParseClient(line string) (Client, error) {
+	fields := strings.Split(line, ",")
+	if len(fields) < 5 {
+		fmt.Println("ERRRRRRR: ", fields)
+		return Client{}, ErrNotEnoughFields
+	}
+
+	return Client{
+		VirtualIP:      strings.Trim(fields[0], " "),
+		RealIP:         strings.Trim(fields[1], " "),
+		CommonName:     strings.Trim(fields[0], " "),
+		BytesReceived:  strings.Trim(fields[2], " "),
+		BytesSent:      strings.Trim(fields[3], " "),
+		ConnectedSince: strings.Trim(fields[4], " "),
+	}, nil
+}
+
+// Routing table
+type Route struct {
+	VirtualIP  string
+	RealIP     string
+	CommonName string
+	LastRef    string
+}
+
+func ParseRoute(line string) (Route, error) {
+	fields := strings.Split(line, ",")
+	if len(fields) < 4 {
+		fmt.Println("ERRRRRRR: ", fields)
+		return Route{}, ErrNotEnoughFields
+	}
+
+	return Route{
+		VirtualIP:  strings.Trim(fields[0], " "),
+		RealIP:     strings.Trim(fields[2], " "),
+		CommonName: strings.Trim(fields[1], " "),
+		LastRef:    strings.Trim(fields[3], " "),
+	}, nil
+}
+
 // Controller controls openvpn process via its management interface
 type Controller interface {
 	Signal(sig os.Signal) error
@@ -87,6 +149,10 @@ type Controller interface {
 	Getpid() (int, error)
 	GetLogs() (string, error)
 	GetStates() ([]State, error)
+	GetStatus() (Status, error)
+	GetClients() ([]Client, error)
+	GetRouting() ([]Route, error)
+	GetGlobalStats() (GlobalStats, error)
 	SubscribeState(ch chan State) error
 	SubscribeByteCount(chIn, chOut chan int64) error
 	SubscribeLog(ch chan string) error
@@ -242,6 +308,243 @@ func (c *defaultController) GetStates() ([]State, error) {
 			return nil, ErrReadTimeout
 		case <-c.closed:
 			return nil, ErrClosed
+		}
+	}
+}
+
+func (c *defaultController) GetStatus() (Status, error) {
+	if c.conn == nil {
+		return Status{}, ErrNotConnected
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// send command
+	if _, err := c.conn.Write([]byte("status\n")); err != nil {
+		return Status{}, err
+	}
+
+	// read output
+	var status Status
+
+	var parseClient = false
+	var parseRoute = false
+	var parseGlobalStats = false
+
+	var clients []Client
+	var routing []Route
+	var stats GlobalStats
+
+	for {
+		select {
+		case line := <-c.output:
+			fmt.Println(line)
+			if line == "END" {
+				fmt.Println(stats)
+				fmt.Println(clients)
+				fmt.Println(routing)
+				status.GlobalStats = stats
+				status.Clients = clients
+				status.Routing = routing
+				return status, nil
+			}
+
+			if line == "Common Name,Real Address,Bytes Received,Bytes Sent,Connected Since" {
+				parseClient = true
+				continue
+			}
+
+			if line == "ROUTING TABLE" {
+				parseClient = false
+			}
+
+			if line == "Virtual Address,Common Name,Real Address,Last Ref" {
+				parseRoute = true
+				continue
+			}
+
+			if line == "GLOBAL STATS" {
+				parseRoute = false
+				parseGlobalStats = true
+				continue
+			}
+
+			if parseClient {
+				client, err := ParseClient(line)
+				if err != nil {
+					return status, err
+				}
+
+				clients = append(clients, client)
+				continue
+			}
+
+			if parseRoute {
+				route, err := ParseRoute(line)
+				if err != nil {
+					return status, err
+				}
+
+				routing = append(routing, route)
+				continue
+			}
+
+			if parseGlobalStats {
+				if strings.HasPrefix(line, "Max bcast/mcast queue length") {
+					fields := strings.Split(line, ",")
+					if len(fields) < 2 {
+						continue
+					}
+
+					stats.Queue = strings.Trim(fields[1], " ")
+				}
+			}
+
+		case <-time.After(time.Duration(100) * time.Millisecond):
+			return Status{}, ErrReadTimeout
+		case <-c.closed:
+			return Status{}, ErrClosed
+		}
+	}
+}
+
+func (c *defaultController) GetClients() ([]Client, error) {
+	if c.conn == nil {
+		return nil, ErrNotConnected
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// send command
+	if _, err := c.conn.Write([]byte("status\n")); err != nil {
+		return nil, err
+	}
+
+	// read output
+	var clients []Client
+	var startParse = false
+	for {
+		select {
+		case line := <-c.output:
+			if line == "ROUTING TABLE" {
+				return clients, nil
+			}
+
+			if line == "Common Name,Real Address,Bytes Received,Bytes Sent,Connected Since" {
+				startParse = true
+				continue
+			}
+
+			if !startParse {
+				continue
+			}
+
+			client, err := ParseClient(line)
+			if err != nil {
+				return nil, err
+			}
+			clients = append(clients, client)
+		case <-time.After(time.Duration(100) * time.Millisecond):
+			return nil, ErrReadTimeout
+		case <-c.closed:
+			return nil, ErrClosed
+		}
+	}
+}
+
+func (c *defaultController) GetRouting() ([]Route, error) {
+	if c.conn == nil {
+		return nil, ErrNotConnected
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// send command
+	if _, err := c.conn.Write([]byte("status\n")); err != nil {
+		return nil, err
+	}
+
+	// read output
+	var routing []Route
+	var startParse = false
+	for {
+		select {
+		case line := <-c.output:
+			if line == "GLOBAL STATS" {
+				return routing, nil
+			}
+
+			if line == "Virtual Address,Common Name,Real Address,Last Ref" {
+				startParse = true
+				continue
+			}
+
+			if !startParse {
+				continue
+			}
+
+			route, err := ParseRoute(line)
+			if err != nil {
+				return nil, err
+			}
+			routing = append(routing, route)
+		case <-time.After(time.Duration(100) * time.Millisecond):
+			return nil, ErrReadTimeout
+		case <-c.closed:
+			return nil, ErrClosed
+		}
+	}
+}
+
+func (c *defaultController) GetGlobalStats() (GlobalStats, error) {
+	if c.conn == nil {
+		return GlobalStats{}, ErrNotConnected
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// send command
+	if _, err := c.conn.Write([]byte("status\n")); err != nil {
+		return GlobalStats{}, err
+	}
+
+	// read output
+	var stats GlobalStats
+	var startParse bool
+	for {
+		select {
+		case line := <-c.output:
+
+			if line == "END" {
+				return stats, nil
+			}
+
+			if line == "GLOBAL STATS" {
+				startParse = true
+				continue
+			}
+
+			if !startParse {
+				continue
+			}
+
+			if strings.HasPrefix(line, "Max bcast/mcast queue length") {
+				fields := strings.Split(line, ",")
+				if len(fields) < 2 {
+					continue
+				}
+
+				stats.Queue = strings.Trim(fields[1], " ")
+			}
+
+		case <-time.After(time.Duration(100) * time.Millisecond):
+			return GlobalStats{}, ErrReadTimeout
+		case <-c.closed:
+			return GlobalStats{}, ErrClosed
 		}
 	}
 }
