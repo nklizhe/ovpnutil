@@ -105,7 +105,6 @@ type Client struct {
 func ParseClient(line string) (Client, error) {
 	fields := strings.Split(line, ",")
 	if len(fields) < 5 {
-		fmt.Println("ERRRRRRR: ", fields)
 		return Client{}, ErrNotEnoughFields
 	}
 
@@ -130,7 +129,6 @@ type Route struct {
 func ParseRoute(line string) (Route, error) {
 	fields := strings.Split(line, ",")
 	if len(fields) < 4 {
-		fmt.Println("ERRRRRRR: ", fields)
 		return Route{}, ErrNotEnoughFields
 	}
 
@@ -267,7 +265,6 @@ func (c *defaultController) GetLogs() (string, error) {
 			if strings.HasPrefix(line, "END") {
 				return strings.Join(logs, "\n"), nil
 			}
-			fmt.Print(line)
 			logs = append(logs, line)
 			continue
 		case <-time.After(time.Duration(1000) * time.Millisecond):
@@ -339,11 +336,7 @@ func (c *defaultController) GetStatus() (Status, error) {
 	for {
 		select {
 		case line := <-c.output:
-			fmt.Println(line)
 			if line == "END" {
-				fmt.Println(stats)
-				fmt.Println(clients)
-				fmt.Println(routing)
 				status.GlobalStats = stats
 				status.Clients = clients
 				status.Routing = routing
