@@ -126,6 +126,22 @@ type Route struct {
 	LastRef    string
 }
 
+func (r *Route) VirtualIsIPv4() bool {
+	return isIPv4(r.VirtualIP)
+}
+
+func (r *Route) VirtualIsIPv6() bool {
+	return isIPv6(r.VirtualIP)
+}
+
+func (r *Route) RealIsIPv4() bool {
+	return isIPv4(r.VirtualIP)
+}
+
+func (r *Route) RealIsIPv6() bool {
+	return isIPv6(r.VirtualIP)
+}
+
 func ParseRoute(line string) (Route, error) {
 	fields := strings.Split(line, ",")
 	if len(fields) < 4 {
@@ -484,7 +500,7 @@ func (c *defaultController) GetRouting() ([]Route, error) {
 				return nil, err
 			}
 			routing = append(routing, route)
-		case <-time.After(time.Duration(100) * time.Millisecond):
+		case <-time.After(time.Duration(100) * time.Second):
 			return nil, ErrReadTimeout
 		case <-c.closed:
 			return nil, ErrClosed
