@@ -173,8 +173,8 @@ type Controller interface {
 }
 
 // Dial connects to an openvpn management interface and returns a Controller
-func Dial(addr string) (Controller, error) {
-	conn, err := net.Dial("tcp", addr)
+func Dial(addr string, t string) (Controller, error) {
+	conn, err := net.Dial(t, addr)
 	if err != nil {
 		return nil, err
 	}
