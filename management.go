@@ -223,7 +223,7 @@ func (c *defaultController) Close() {
 	defer c.mutex.Unlock()
 
 	if c.conn != nil {
-		c.conn.Write([]byte("exit\n"))
+		c.conn.Close()
 	}
 }
 
