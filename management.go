@@ -500,7 +500,7 @@ func (c *defaultController) GetRouting() ([]Route, error) {
 				return nil, err
 			}
 			routing = append(routing, route)
-		case <-time.After(time.Duration(100) * time.Second):
+		case <-time.After(time.Duration(5) * time.Second):
 			return nil, ErrReadTimeout
 		case <-c.closed:
 			return nil, ErrClosed
@@ -641,10 +641,11 @@ func (c *defaultController) close() {
 
 func (c *defaultController) listen() {
 	rd := bufio.NewReader(c.conn)
+
 	for {
 		line, err := rd.ReadString('\n')
 		if err != nil {
-			c.close()
+			c.Close()
 			return
 		}
 		line = strings.Trim(line, "\n\r")
