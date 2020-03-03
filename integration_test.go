@@ -64,6 +64,62 @@ func TestGetStates(t *testing.T) {
 	fmt.Println(states)
 }
 
+func TestGetStatus(t *testing.T) {
+	ctl, err := Dial("127.0.0.1:1337")
+	assert.NoError(t, err)
+	assert.NotNil(t, ctl)
+
+	defer ctl.Close()
+
+	status, err := ctl.GetStatus()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status)
+
+	fmt.Println(status)
+}
+
+func TestGetClients(t *testing.T) {
+	ctl, err := Dial("127.0.0.1:1337")
+	assert.NoError(t, err)
+	assert.NotNil(t, ctl)
+
+	defer ctl.Close()
+
+	clients, err := ctl.GetClients()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, clients)
+
+	fmt.Println(clients)
+}
+
+func TestGetRouting(t *testing.T) {
+	ctl, err := Dial("127.0.0.1:1337")
+	assert.NoError(t, err)
+	assert.NotNil(t, ctl)
+
+	defer ctl.Close()
+
+	routing, err := ctl.GetRouting()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, routing)
+
+	fmt.Println(clients)
+}
+
+func TestGetGlobalStats(t *testing.T) {
+	ctl, err := Dial("127.0.0.1:1337")
+	assert.NoError(t, err)
+	assert.NotNil(t, ctl)
+
+	defer ctl.Close()
+
+	stats, err := ctl.GetGlobalStats()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, stats)
+
+	fmt.Println(stats)
+}
+
 func TestSubscribeByteCount(t *testing.T) {
 	ctl, err := Dial("127.0.0.1:1337")
 	assert.NoError(t, err)

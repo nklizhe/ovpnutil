@@ -6,7 +6,7 @@ Go client for OpenVPN [management interface](https://openvpn.net/index.php/open-
 
 ## Installation
 
-	go get github.com/nklizhe/ovpnutil
+	go get github.com/oashnic/ovpnutil
 
 ## License
 
